@@ -15,7 +15,7 @@ ENV TINI_BASEURL="https://github.com/krallin/tini/releases/download"
 
 RUN \
     wget -nv -O /usr/local/bin/tini ${TINI_BASEURL}/v${TINI_VERSION}/tini && \
-    echo "${TINI_SHASUM} /usr/local/bin/tini" | sha256sum -c - && \
+    echo "${TINI_SHASUM} /usr/bin/tini" | sha256sum -c - && \
     chmod +x /usr/bin/tini
 
 # Get restic executable
