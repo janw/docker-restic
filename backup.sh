@@ -1,52 +1,64 @@
-#!/bin/sh
+#!/usr/bin/env bash
+set -euo pipefail
+IFS=$'\n\t'
 
-lastLogfile="/var/log/backup-last.log"
-
-copyErrorLog() {
-  cp ${lastLogfile} /var/log/backup-error-last.log
-}
+export RESTIC_REPOSITORY=${RESTIC_REPOSITORY:-/repo}
+RESTIC_DATA_DIRECTORY=${RESTIC_DATA_DIRECTORY:-/data}
+RESTIC_TAG=${RESTIC_TAG:-}
+RESTIC_JOB_ARGS=${RESTIC_JOB_ARGS:-}
+RESTIC_FORGET_ARGS=${RESTIC_FORGET_ARGS:-}
+RESTIC_LAST_LOGFILE=${RESTIC_LAST_LOGFILE:-"/logs/backup-last.log"}
+RESTIC_LAST_ERROR_LOGFILE=${RESTIC_LAST_ERROR_LOGFILE:-"/logs/backup-error-last.log"}
 
 logLast() {
-  echo "$1" >> ${lastLogfile}
+  echo "$1" >> "${RESTIC_LAST_LOGFILE}"
 }
 
+finish() {
+    rc=$?
+    end=`date +%s`
+    echo $(
+    if [ $rc -eq 0 ]; then
+        echo "==> Finished successfully"
+    elif [ $rc -eq 1 ]; then
+        echo "==> Backup failed"
+    elif [ $rc -eq 2 ]; then
+        echo "==> Forget failed"
+    fi
+    ) "at $(date +"%Y-%m-%d %H:%M:%S") after $((end-start)) seconds" | \
+        tee -a "${RESTIC_LAST_LOGFILE}"
+    if [ $rc -ne 0 ]; then
+        echo "==> Removing stale locks" | tee -a "${RESTIC_LAST_LOGFILE}"
+        restic unlock > >(tee -a $RESTIC_LAST_LOGFILE) 2>&1 || true
+        cp "${RESTIC_LAST_LOGFILE}" "${RESTIC_LAST_ERROR_LOGFILE}"
+        kill 1
+    fi
+}
+trap finish EXIT
+
+# Start the backup with logging the state of variables first
 start=`date +%s`
-rm -f ${lastLogfile}
-echo "Starting Backup at $(date +"%Y-%m-%d %H:%M:%S")"
-echo "Starting Backup at $(date)" >> ${lastLogfile}
-logLast "BACKUP_CRON: ${BACKUP_CRON}"
+echo "==> Starting backup at $(date +"%Y-%m-%d %H:%M:%S")" | tee ${RESTIC_LAST_LOGFILE}
 logLast "RESTIC_TAG: ${RESTIC_TAG}"
 logLast "RESTIC_FORGET_ARGS: ${RESTIC_FORGET_ARGS}"
 logLast "RESTIC_JOB_ARGS: ${RESTIC_JOB_ARGS}"
 logLast "RESTIC_REPOSITORY: ${RESTIC_REPOSITORY}"
-logLast "AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID}"
+logLast "RESTIC_DATA_DIRECTORY: ${RESTIC_DATA_DIRECTORY}"
+
+# If RESTIG_TAG is set append it to the job command
+RESTIC_JOB_CMD="restic backup ${RESTIC_DATA_DIRECTORY} ${RESTIC_JOB_ARGS:-}"
+if [ ! -z "${RESTIC_TAG}" ]; then
+	RESTIC_JOB_CMD="${RESTIC_JOB_CMD} --tag=${RESTIC_TAG}"
+fi
 
 # Do not save full backup log to logfile but to backup-last.log
-restic backup /data ${RESTIC_JOB_ARGS} --tag=${RESTIC_TAG?"Missing environment variable RESTIC_TAG"} >> ${lastLogfile} 2>&1
-rc=$?
-logLast "Finished backup at $(date)"
-if [[ $rc == 0 ]]; then
-    echo "Backup Successfull" 
-else
-    echo "Backup Failed with Status ${rc}"
-    restic unlock
-    copyErrorLog
-    kill 1
-fi
+eval "$RESTIC_JOB_CMD" > >(tee -a $RESTIC_LAST_LOGFILE) 2>&1 || exit 1
+logLast "Finished backup"
 
-if [ -n "${RESTIC_FORGET_ARGS}" ]; then
-    echo "Forget about old snapshots based on RESTIC_FORGET_ARGS = ${RESTIC_FORGET_ARGS}"
-    restic forget ${RESTIC_FORGET_ARGS} >> ${lastLogfile} 2>&1
-    rc=$?
-    logLast "Finished forget at $(date)"
-    if [[ $rc == 0 ]]; then
-        echo "Forget Successfull"
-    else
-        echo "Forget Failed with Status ${rc}"
-        restic unlock
-        copyErrorLog
-    fi
+# If got RESTIC_FORGET_ARGS run forget
+if [ ! -z "${RESTIC_FORGET_ARGS}" ]; then
+    echo "==> Starting forget at $(date +"%Y-%m-%d %H:%M:%S")" | \
+        tee -a "${RESTIC_LAST_LOGFILE}"
+    eval "restic forget ${RESTIC_FORGET_ARGS}" > >(tee -a $RESTIC_LAST_LOGFILE) 2>&1 || exit 2
+    logLast "Finished forget"
 fi
-
-end=`date +%s`
-echo "Finished Backup at $(date +"%Y-%m-%d %H:%M:%S") after $((end-start)) seconds"

@@ -1,7 +1,8 @@
 # Restic Backup Docker Container
+
 A docker container to automate [restic backups](https://restic.github.io/)
 
-This container runs restic backups in regular intervals. 
+This container runs restic backups in regular intervals.
 
 * Easy setup and maintanance
 * Support for different targets (currently: Local, NFS, SFTP)
@@ -10,12 +11,12 @@ This container runs restic backups in regular intervals.
 **Container**: [lobaro/restic-backup-docker](https://hub.docker.com/r/lobaro/restic-backup-docker/)
 
 Stable
-```
+```bash
 docker pull lobaro/restic-backup-docker:v1.0
 ```
 
 Latest (experimental)
-```
+```bash
 docker pull lobaro/restic-backup-docker
 ```
 
@@ -104,7 +105,7 @@ Versioning follows [Semantic versioning](http://semver.org/)
 
 ! Breaking changes
 
-**:latest**  
+**:latest**
 * ! `--prune` must be passed to `RESTIC_FORGET_ARGS` to execute prune after forget.
 * Switch to base Docker container to `golang:1.7-alpine` to support latest restic build.
 
