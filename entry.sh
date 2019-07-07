@@ -3,7 +3,7 @@ set -euo pipefail
 IFS=$'\n\t'
 
 # By default backup every 6 hours
-BACKUP_CRON=${BACKUP_CRON:-"* * * * *"}
+BACKUP_CRON=${BACKUP_CRON:-"* */6 * * *"}
 export RESTIC_REPOSITORY=${RESTIC_REPOSITORY:-"/repo"}
 
 
@@ -27,7 +27,7 @@ if [ ! -f "$RESTIC_REPOSITORY/config" ]; then
 fi
 
 # Pass on relevant variables
-declare -p | grep 'RESTIC_' > /backup.env
+declare -p | grep -Ev 'BASH|EUID|PPID|SHELLOPTS|UID' > /backup.env
 
 # Start the cron daemon
 echo "Setup backup cron job with cron expression BACKUP_CRON: ${BACKUP_CRON}"

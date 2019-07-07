@@ -5,19 +5,14 @@ A docker container to automate [restic backups](https://restic.github.io/)
 This container runs restic backups in regular intervals.
 
 * Easy setup and maintanance
-* Support for different targets (currently: Local, NFS, SFTP)
+* Support for different Restic targets configurable through environment variables
 * Support `restic mount` inside the container to browse the backup files
 
-**Container**: [lobaro/restic-backup-docker](https://hub.docker.com/r/lobaro/restic-backup-docker/)
+**Container**: [registry.gitlab.com/janw/restic-backup-docker](https://gitlab.com/janw/restic-backup-docker/container_registry)
 
-Stable
+Latest
 ```bash
-docker pull lobaro/restic-backup-docker:v1.0
-```
-
-Latest (experimental)
-```bash
-docker pull lobaro/restic-backup-docker
+docker pull registry.gitlab.com/janw/restic-backup-docker
 ```
 
 Please don't hesitate to report any issue you find. **Thanks.**

@@ -14,7 +14,7 @@ ENV TINI_SHASUM="12d20136605531b09a2c2dac02ccee85e1b874eb322ef6baf7561cd93f93c85
 ENV TINI_BASEURL="https://github.com/krallin/tini/releases/download"
 
 RUN \
-    wget -nv -O /usr/local/bin/tini ${TINI_BASEURL}/v${TINI_VERSION}/tini && \
+    wget -nv -O /usr/bin/tini ${TINI_BASEURL}/v${TINI_VERSION}/tini && \
     echo "${TINI_SHASUM} /usr/bin/tini" | sha256sum -c - && \
     chmod +x /usr/bin/tini
 
