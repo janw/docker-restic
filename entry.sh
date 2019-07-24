@@ -33,4 +33,6 @@ declare -p | grep -Ev 'BASH|EUID|PPID|SHELLOPTS|UID' > /backup.env
 echo "Setup backup cron job with cron expression BACKUP_CRON: ${BACKUP_CRON}"
 echo -e "SHELL=/bin/bash\nBASH_ENV=/backup.env\n${BACKUP_CRON} /backup.sh > /proc/1/fd/1 2>/proc/1/fd/2" | crontab
 
+bash /backup.sh &
+
 exec cron -f
