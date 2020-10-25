@@ -1,8 +1,12 @@
 #!/bin/bash
 
 VERSION_RESTIC=$(cat VERSION)
+VERSION_RESTIC_MINOR="${VERSION_RESTIC%.*}"
 
 echo "Tagging with Restic version $VERSION_RESTIC"
+docker tag "$IMAGE_NAME" "$DOCKER_REPO:$VERSION_RESTIC"
+docker push "$DOCKER_REPO:$VERSION_RESTIC"
 
-docker tag $IMAGE_NAME $DOCKER_REPO:$VERSION_RESTIC
-docker push $DOCKER_REPO:$VERSION_RESTIC
+echo "Tagging with Restic minor version $VERSION_RESTIC_MINOR"
+docker tag "$IMAGE_NAME" "$DOCKER_REPO:$VERSION_RESTIC_MINOR"
+docker push "$DOCKER_REPO:$VERSION_RESTIC_MINOR"
