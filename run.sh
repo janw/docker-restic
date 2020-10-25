@@ -17,7 +17,7 @@ echo "Removing old 'backup-test' container if exists"
 docker rm -f -v backup-test || true
 
 echo "Building current image"
-docker build -t restic-backup .
+docker build -t willhaus/restic .
 
 echo "Start backup-test container. Backup of test-data to test-repo"
 docker run --privileged --name backup-test \
@@ -28,4 +28,4 @@ docker run --privileged --name backup-test \
 -e "HEALTHCHECK_URL" \
 -v "$DATA_DIR":/data \
 -v "$REPO_DIR":/target \
--t restic-backup
+-t willhaus/restic
