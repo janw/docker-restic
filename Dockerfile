@@ -8,7 +8,7 @@ ENV RESTIC_FORGET_ARGS=
 ENV HEALTHCHECK_URL=
 
 RUN set -e; \
-    apk add --update --no-cache rclone curl bash; \
+    apk add --update --no-cache rclone curl bash tini; \
     mkdir /.cache; \
     chgrp -R 0 /.cache; \
     chmod -R g=u /.cache
@@ -23,4 +23,5 @@ COPY backup.sh /backup.sh
 
 WORKDIR "/"
 
-ENTRYPOINT ["/backup.sh"]
+ENTRYPOINT [ "tini", "--" ]
+CMD ["/backup.sh"]
