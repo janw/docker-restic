@@ -1,64 +1,97 @@
-#!/usr/bin/env bash
-set -euo pipefail
-IFS=$'\n\t'
+#!/bin/bash
+set -uo pipefail
 
-export RESTIC_REPOSITORY=${RESTIC_REPOSITORY:-/repo}
-RESTIC_DATA_DIRECTORY=${RESTIC_DATA_DIRECTORY:-/data}
-RESTIC_TAG=${RESTIC_TAG:-}
-RESTIC_JOB_ARGS=${RESTIC_JOB_ARGS:-}
-RESTIC_FORGET_ARGS=${RESTIC_FORGET_ARGS:-}
-RESTIC_LAST_LOGFILE=${RESTIC_LAST_LOGFILE:-"/logs/backup-last.log"}
-RESTIC_LAST_ERROR_LOGFILE=${RESTIC_LAST_ERROR_LOGFILE:-"/logs/backup-error-last.log"}
+log_tmp_file=$(mktemp)
+echo "Will write logs to $log_tmp_file"
 
 logLast() {
-  echo "$1" >> "${RESTIC_LAST_LOGFILE}"
+    echo "$1" | tee -a "$log_tmp_file"
 }
 
-finish() {
-    rc=$?
-    end=`date +%s`
-    echo $(
-    if [ $rc -eq 0 ]; then
-        echo "==> Finished successfully"
-    elif [ $rc -eq 1 ]; then
-        echo "==> Backup failed"
-    elif [ $rc -eq 2 ]; then
-        echo "==> Forget failed"
-    fi
-    ) "at $(date +"%Y-%m-%d %H:%M:%S") after $((end-start)) seconds" | \
-        tee -a "${RESTIC_LAST_LOGFILE}"
-    if [ $rc -ne 0 ]; then
-        echo "==> Removing stale locks" | tee -a "${RESTIC_LAST_LOGFILE}"
-        restic unlock > >(tee -a $RESTIC_LAST_LOGFILE) 2>&1 || true
-        cp "${RESTIC_LAST_LOGFILE}" "${RESTIC_LAST_ERROR_LOGFILE}"
-        kill 1
+healthcheck() {
+    local suffix=${1:-}
+    if [ -n "$HEALTHCHECK_URL" ]; then
+        echo -n "Reporting healthcheck $suffix ... "
+        curl -fSsL --retry 3 -X POST \
+            --user-agent "docker-restic/0.1.0" \
+            --data-binary "@${log_tmp_file}" "${HEALTHCHECK_URL}${suffix}"
+        echo
+    else
+        echo "No HEALTHCHECK_URL provided. Skipping healthcheck."
     fi
 }
-trap finish EXIT
 
-# Start the backup with logging the state of variables first
-start=`date +%s`
-echo "==> Starting backup at $(date +"%Y-%m-%d %H:%M:%S")" | tee ${RESTIC_LAST_LOGFILE}
-logLast "RESTIC_TAG: ${RESTIC_TAG}"
-logLast "RESTIC_FORGET_ARGS: ${RESTIC_FORGET_ARGS}"
-logLast "RESTIC_JOB_ARGS: ${RESTIC_JOB_ARGS}"
-logLast "RESTIC_REPOSITORY: ${RESTIC_REPOSITORY}"
-logLast "RESTIC_DATA_DIRECTORY: ${RESTIC_DATA_DIRECTORY}"
+healthcheck /start
 
-# If RESTIG_TAG is set append it to the job command
-RESTIC_JOB_CMD="restic backup ${RESTIC_DATA_DIRECTORY} ${RESTIC_JOB_ARGS:-}"
-if [ ! -z "${RESTIC_TAG}" ]; then
-	RESTIC_JOB_CMD="${RESTIC_JOB_CMD} --tag=${RESTIC_TAG}"
+restic snapshots &>/dev/null
+status=$?
+logLast "Check Repo status $status"
+
+if [ $status != 0 ]; then
+    logLast "Restic repository '${RESTIC_REPOSITORY}' does not exists. Running restic init."
+    restic init
+    status=$?
+    if [ $status != 0 ]; then
+        logLast "Failed to init the repository: '${RESTIC_REPOSITORY}'"
+        healthcheck /fail
+        exit 1
+    fi
 fi
 
-# Do not save full backup log to logfile but to backup-last.log
-eval "$RESTIC_JOB_CMD" > >(tee -a $RESTIC_LAST_LOGFILE) 2>&1 || exit 1
-logLast "Finished backup"
+if [ -f "/hooks/pre-backup.sh" ]; then
+    logLast "Running pre-backup script."
+    /hooks/pre-backup.sh 2>&1 | tee -a "$log_tmp_file"
+else
+    logLast "No /hooks/pre-backup.sh script found. Skipping."
+fi
 
-# If got RESTIC_FORGET_ARGS run forget
-if [ ! -z "${RESTIC_FORGET_ARGS}" ]; then
-    echo "==> Starting forget at $(date +"%Y-%m-%d %H:%M:%S")" | \
-        tee -a "${RESTIC_LAST_LOGFILE}"
-    eval "restic forget ${RESTIC_FORGET_ARGS}" > >(tee -a $RESTIC_LAST_LOGFILE) 2>&1 || exit 2
-    logLast "Finished forget"
+start=$(date +'%s')
+logLast "Starting Backup at $(date +"%Y-%m-%d %H:%M:%S")"
+logLast "RESTIC_REPOSITORY: ${RESTIC_REPOSITORY:-}"
+logLast "RESTIC_JOB_ARGS: ${RESTIC_JOB_ARGS:-}"
+logLast "RESTIC_FORGET_ARGS: ${RESTIC_FORGET_ARGS:-}"
+logLast "AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID:-}"
+
+# shellcheck disable=SC2086
+restic backup /data ${RESTIC_JOB_ARGS} "$@" 2>&1 | tee -a "$log_tmp_file"
+rc_backup=$?
+logLast "Finished backup at $(date +"%Y-%m-%d %H:%M:%S")"
+if [[ $rc_backup == 0 ]]; then
+    logLast "Backup Successful"
+else
+    logLast "Backup Failed with Status ${rc_backup}"
+    restic unlock
+fi
+
+if [ -n "${RESTIC_FORGET_ARGS:-}" ]; then
+    logLast "Forgetting old snapshots based on RESTIC_FORGET_ARGS = ${RESTIC_FORGET_ARGS}"
+    # shellcheck disable=SC2086
+    restic forget ${RESTIC_FORGET_ARGS} 2>&1 | tee -a "$log_tmp_file"
+    rc_forget=$?
+    logLast "Finished forget at $(date)"
+    if [[ $rc_forget == 0 ]]; then
+        logLast "Forget Successful"
+    else
+        logLast "Forget Failed with Status ${rc_forget}"
+        restic unlock
+    fi
+else
+    logLast "No RESTIC_FORGET_ARGS provided. Skipping forget."
+fi
+
+end=$(date +'%s')
+logLast "Finished Backup at $(date +"%Y-%m-%d %H:%M:%S") after $((end - start)) seconds"
+
+if [ -f "/hooks/post-backup.sh" ]; then
+    logLast "Running post-backup script."
+    RC_BACKUP=$rc_backup RC_FORGET=$rc_forget \
+        /hooks/post-backup.sh 2>&1 | tee -a "$log_tmp_file"
+else
+    logLast "No /hooks/post-backup.sh script found. Skipping."
+fi
+
+if [ $rc_backup = 0 ]; then
+    healthcheck
+else
+    healthcheck /fail
 fi

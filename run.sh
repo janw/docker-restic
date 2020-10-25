@@ -1,16 +1,31 @@
 #!/bin/sh
+set -e
 
-echo "Removing old container names 'backup-test' if exists"
+DATA_DIR="$PWD/test-data"
+REPO_DIR="$PWD/test-repo"
+
+if [ ! -d "$REPO_DIR" ]; then
+    mkdir -p "$REPO_DIR"
+fi
+
+if [ ! -d "$DATA_DIR" ]; then
+    mkdir -p "$DATA_DIR"
+    echo "Test File" > "$DATA_DIR/testfile.txt"
+fi
+
+echo "Removing old 'backup-test' container if exists"
 docker rm -f -v backup-test || true
 
-echo "Start backup-test container. Backup of ~/test-data/ to repository ~/test-repo/ every minute"
+echo "Building current image"
+docker build -t restic-backup .
+
+echo "Start backup-test container. Backup of test-data to test-repo"
 docker run --privileged --name backup-test \
+--hostname "test-instance" \
 -e "RESTIC_PASSWORD=test" \
--e "RESTIC_TAG=test" \
--e "BACKUP_CRON=0 0 * * *" \
+-e "RESTIC_JOB_ARGS=--tag=test" \
 -e "RESTIC_FORGET_ARGS=--keep-last 10" \
--v ~/test-data:/data \
--v ~/test-repo/:/mnt/restic \
+-e "HEALTHCHECK_URL" \
+-v "$DATA_DIR":/data \
+-v "$REPO_DIR":/target \
 -t restic-backup
-
-
