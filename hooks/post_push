@@ -1,0 +1,8 @@
+#!/bin/bash
+
+VERSION_RESTIC=$(cat VERSION)
+
+echo "Tagging with Restic version $VERSION_RESTIC"
+
+docker tag $IMAGE_NAME $DOCKER_REPO:$VERSION_RESTIC
+docker push $DOCKER_REPO:$VERSION_RESTIC
