@@ -50,7 +50,11 @@ logLast "Starting Backup at $(date +"%Y-%m-%d %H:%M:%S")"
 logLast "RESTIC_REPOSITORY: ${RESTIC_REPOSITORY:-}"
 logLast "RESTIC_JOB_ARGS: ${RESTIC_JOB_ARGS:-}"
 logLast "RESTIC_FORGET_ARGS: ${RESTIC_FORGET_ARGS:-}"
-logLast "AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID:-}"
+logLast ""
+logLast "Directory listing:"
+
+# shellcheck disable=SC2012
+ls -Ahl /data | tee -a "$log_tmp_file"
 
 # shellcheck disable=SC2086
 restic backup /data ${RESTIC_JOB_ARGS} "$@" 2>&1 | tee -a "$log_tmp_file"
