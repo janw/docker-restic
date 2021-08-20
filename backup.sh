@@ -28,14 +28,9 @@ status=$?
 logLast "Check Repo status $status"
 
 if [ $status != 0 ]; then
-    logLast "Restic repository '${RESTIC_REPOSITORY}' does not exists. Running restic init."
-    restic init
-    status=$?
-    if [ $status != 0 ]; then
-        logLast "Failed to init the repository: '${RESTIC_REPOSITORY}'"
-        healthcheck /fail
-        exit 1
-    fi
+    logLast "Repository '${RESTIC_REPOSITORY}' does not exist. Initialize repo with 'restic init'."
+    healthcheck /fail
+    exit 1
 fi
 
 if [ -f "/hooks/pre-backup.sh" ]; then
