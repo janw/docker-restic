@@ -1,0 +1,29 @@
+name: ci
+on: push
+jobs:
+  build:
+    name: docker-build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+
+      - id: getversion
+        run: |
+          export VERSION_RESTIC=$(cat VERSION)
+          echo VERSION_RESTIC=${VERSION_RESTIC}
+          echo "VERSION_RESTIC=$VERSION_RESTIC" >> $GITHUB_ENV
+
+      - id: docker-tag
+        uses: yuya-takeyama/docker-tag-from-github-ref-action@v1
+
+      - uses: docker/login-action@v1
+        with:
+          registry: ghcr.io
+          username: ${{ github.repository_owner }}
+          password: ${{ secrets.CR_PAT }}
+
+      - uses: docker/build-push-action@v2
+        with:
+          tags: ghcr.io/janw/restic:${{ steps.docker-tag.outputs.tag }}
+          push: true
+          build-args: VERSION_RESTIC=${{ env.VERSION_RESTIC }}
