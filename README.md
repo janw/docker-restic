@@ -8,12 +8,12 @@ This container runs restic backups as one-off jobs and supports reporting to [he
 * Support for different Restic targets configurable through environment variables
 * Support `restic mount` inside the container to browse the backup files
 
-**Container**: [docker.io/willhaus/restic](https://hub.docker.com/repository/docker/willhaus/restic)
+**Container**: [ghcr.io/janw/restic](https://github.com/janw/docker-restic/pkgs/container/restic)
 
 Latest
 
 ```bash
-docker pull willhaus/restic
+docker pull ghcr.io/janw/restic
 ```
 
 Please don't hesitate to report any issue you find. Thanks.

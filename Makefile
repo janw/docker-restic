@@ -1,6 +1,6 @@
 
 VERSION = $(shell cat VERSION)
-DOCKER_TAG = willhaus/restic
+DOCKER_TAG = ghcr.io/janw/restic
 
 .PHONY: version
 version:
