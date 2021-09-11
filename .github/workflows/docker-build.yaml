@@ -1,32 +1,43 @@
-name: ci
-on:
-  push:
-  release:
-    types: [published]
+name: docker-build
+
+on: push
+
 jobs:
   build:
-    name: docker-build
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v2
+      - name: Checkout
+        uses: actions/checkout@v2
 
-      - id: getversion
+      - name: Get Restic target version
+        id: getversion
         run: |
           export VERSION_RESTIC=$(cat VERSION)
           echo VERSION_RESTIC=${VERSION_RESTIC}
           echo "VERSION_RESTIC=$VERSION_RESTIC" >> $GITHUB_ENV
 
-      - id: docker-tag
+      - name: Generate tag(s) from GitHub ref
+        id: docker-tag
         uses: yuya-takeyama/docker-tag-from-github-ref-action@v1
 
-      - uses: docker/login-action@v1
+      - name: Log in to ghcr.io registry
+        uses: docker/login-action@v1
         with:
           registry: ghcr.io
-          username: ${{ github.repository_owner }}
-          password: ${{ secrets.CR_PAT }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
 
-      - uses: docker/build-push-action@v2
+      - name: Get image name from lowercased repo name
+        run: |
+          export IMAGE_NAME="${GITHUB_REPOSITORY,,}"
+          echo "IMAGE_NAME=${IMAGE_NAME/\/docker-/\/}" | tee -a ${GITHUB_ENV}
+
+      - name: Build image
+        uses: docker/build-push-action@v2
         with:
-          tags: ghcr.io/janw/restic:${{ steps.docker-tag.outputs.tag }}
+          tags: ghcr.io/${{ env.IMAGE_NAME }}:${{ steps.docker-tag.outputs.tag }}
           push: true
-          build-args: VERSION_RESTIC=${{ env.VERSION_RESTIC }}
+          labels: |
+            org.opencontainers.image.source=https://github.com/${{ github.repository }}
+          build-args: |
+            VERSION_RESTIC=${{ env.VERSION_RESTIC }}
