@@ -51,3 +51,55 @@ Now you can simply specify the restic repository to be an [SFTP repository](http
 ```bash
 -e "RESTIC_REPOSITORY=sftp:user@host:/tmp/backup"
 ```
+
+## Backups in a Kubernetes CronJob
+
+```yaml
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: backup-to-backblaze-b2
+  namespace: backups
+spec:
+  schedule: "@weekly"
+  concurrencyPolicy: Forbid
+  startingDeadlineSeconds: 300
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          hostname: k
+          restartPolicy: Never
+          containers:
+            - name: restic
+              image: ghcr.io/janw/restic:latest
+              imagePullPolicy: Always
+              env:
+                - name: RESTIC_REPOSITORY
+                  value: b2:my-backblaze-b2-bucket:k
+                - name: HEALTHCHECK_URL
+                  value: https://hc-ping.com/deadbeef-1234-1234-1234-123456789012
+                - name: RESTIC_JOB_ARGS
+                  value: --verbose
+
+                # These should be put in a Secret resource instead!
+                - name: RESTIC_PASSWORD
+                  value: "my_super_secret_backups_password"
+                - name: B2_ACCOUNT_ID
+                  value: "abdc12039812039821098"
+                - name: B2_ACCOUNT_KEY
+                  value: "my_secret_key"
+
+              volumeMounts:
+              - mountPath: /root/.cache/restic
+                name: restic-cache
+              - mountPath: /data
+                name: backup-data
+          volumes:
+          - name: restic-cache
+            hostPath:
+              path: /var/restic-cache
+          - name: backup-data
+            hostPath:
+              path: /mnt/data-to-backup
+```
