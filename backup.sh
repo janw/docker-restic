@@ -46,10 +46,9 @@ logLast "RESTIC_REPOSITORY: ${RESTIC_REPOSITORY:-}"
 logLast "RESTIC_JOB_ARGS: ${RESTIC_JOB_ARGS:-}"
 logLast "RESTIC_FORGET_ARGS: ${RESTIC_FORGET_ARGS:-}"
 logLast ""
-logLast "Directory listing:"
+logLast "Directory tree:"
 
-# shellcheck disable=SC2012
-ls -Ahl /data | tee -a "$log_tmp_file"
+tree -dph -L 3 /data | tee -a "$log_tmp_file"
 
 # shellcheck disable=SC2086
 restic backup /data ${RESTIC_JOB_ARGS} "$@" 2>&1 | tee -a "$log_tmp_file"

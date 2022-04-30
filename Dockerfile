@@ -8,7 +8,7 @@ ENV RESTIC_FORGET_ARGS=
 ENV HEALTHCHECK_URL=
 
 RUN set -e; \
-    apk add --update --no-cache jq rclone curl bash tini; \
+    apk add --update --no-cache jq rclone curl bash tini tree; \
     mkdir /.cache; \
     chgrp -R 0 /.cache; \
     chmod -R g=u /.cache
