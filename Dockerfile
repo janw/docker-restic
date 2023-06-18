@@ -3,7 +3,10 @@ ARG VERSION_RESTIC=
 
 WORKDIR /src
 
-RUN GOOS=${TARGETOS} GOARCH=${TARGETARCH} \
+RUN \
+    set -e; \
+    apk add --no-cache git; \
+    GOOS=${TARGETOS} GOARCH=${TARGETARCH} \
     go install github.com/restic/restic/cmd/restic@v${VERSION_RESTIC}
 
 FROM alpine:3
