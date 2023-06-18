@@ -48,7 +48,7 @@ logLast "RESTIC_FORGET_ARGS: ${RESTIC_FORGET_ARGS:-}"
 logLast ""
 logLast "Directory tree:"
 
-tree -dph -L 3 /data | tee -a "$log_tmp_file"
+tree -xdp /data | tee -a "$log_tmp_file"
 
 # shellcheck disable=SC2086
 restic backup /data ${RESTIC_JOB_ARGS} "$@" 2>&1 | tee -a "$log_tmp_file"

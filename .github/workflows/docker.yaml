@@ -1,0 +1,32 @@
+name: Docker
+
+on:
+  push:
+    branches: [ $default-branch ]
+    tags:
+      - "*"
+  pull_request:
+
+jobs:
+  populate-version:
+    runs-on: ubuntu-latest
+    outputs:
+      VERSION_RESTIC: ${{ steps.set-version.outputs.VERSION_RESTIC }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+
+      - name: Set version
+        id: set-version
+        run: |
+          VERSION_RESTIC=$(cat VERSION)
+          echo "VERSION_RESTIC=$VERSION_RESTIC" >> $GITHUB_OUTPUT
+
+  docker:
+    needs: [populate-version]
+    uses: janw/workflows/.github/workflows/docker.yaml@main
+    with:
+      image-name: janw/restic
+      build-args: |
+        VERSION_RESTIC=${{ needs.populate-version.outputs.VERSION_RESTIC }}
+      build-platforms: linux/amd64,linux/arm64/v8
