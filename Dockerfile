@@ -1,14 +1,22 @@
-FROM golang:1.19-alpine AS builder
-ARG VERSION_RESTIC=
+FROM golang:1.19-alpine AS build_base
 
 WORKDIR /src
 
-# hadolint ignore=DL3018
-RUN \
-    set -e; \
-    apk add --no-cache git; \
-    GOOS=${TARGETOS} GOARCH=${TARGETARCH} \
-    go install github.com/restic/restic/cmd/restic@v${VERSION_RESTIC}
+# hadolint ignore=DL3018,DL3059
+RUN apk add --no-cache git
+
+FROM build_base as build_restic
+ARG VERSION_RESTIC=
+
+# hadolint ignore=DL3059
+RUN GOOS="${TARGETOS}" GOARCH="${TARGETARCH}" \
+    go install "github.com/restic/restic/cmd/restic@v${VERSION_RESTIC}"
+
+FROM build_base as build_runitor
+
+# hadolint ignore=DL3059
+RUN GOOS="${TARGETOS}" GOARCH="${TARGETARCH}" \
+    go install "bdd.fi/x/runitor/cmd/runitor@latest"
 
 FROM alpine:3
 
@@ -34,11 +42,10 @@ VOLUME /data
 # /target is where an externally mounted repo should be
 VOLUME /target
 
-COPY backup.sh /usr/local/bin/backup
-COPY metrics.sh /usr/local/bin/metrics
-COPY --from=builder /go/bin/restic /usr/bin
-
-WORKDIR "/"
+WORKDIR /
+COPY backup.sh metrics.sh entrypoint.sh ./
+COPY --from=build_restic /go/bin/restic /usr/bin
+COPY --from=build_runitor /go/bin/runitor /usr/bin
 
 ENTRYPOINT [ "tini", "--" ]
-CMD ["backup"]
+CMD ["/entrypoint.sh"]

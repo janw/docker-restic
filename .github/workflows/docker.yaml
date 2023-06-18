@@ -8,10 +8,8 @@ on:
   pull_request:
 
 jobs:
-  populate-version:
+  build:
     runs-on: ubuntu-latest
-    outputs:
-      VERSION_RESTIC: ${{ steps.set-version.outputs.VERSION_RESTIC }}
     steps:
       - name: Checkout
         uses: actions/checkout@v3
@@ -22,13 +20,46 @@ jobs:
           VERSION_RESTIC=$(cat VERSION)
           echo "VERSION_RESTIC=$VERSION_RESTIC" >> $GITHUB_OUTPUT
 
-  docker:
-    needs: [populate-version]
-    uses: janw/workflows/.github/workflows/docker.yaml@main
-    with:
-      image-name: janw/restic
-      tag-latest: true
-      version-tag: v${{ needs.populate-version.outputs.VERSION_RESTIC }}
-      build-args: |
-        VERSION_RESTIC=${{ needs.populate-version.outputs.VERSION_RESTIC }}
-      build-platforms: linux/amd64,linux/arm64/v8
+      - name: Docker meta
+        id: meta
+        uses: docker/metadata-action@v4
+        with:
+          images: "ghcr.io/janw/restic"
+          flavor: |
+            latest=false
+          tags: |
+            type=ref,event=pr
+            type=raw,value=latest,enable=${{ github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
+
+            type=semver,pattern=v{{major}},value=${{ steps.set-version.outputs.VERSION_RESTIC }},enable=${{ github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
+            type=semver,pattern=v{{major}}.{{minor}},value=${{ steps.set-version.outputs.VERSION_RESTIC }},enable=${{ github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
+            type=semver,pattern=v{{version}},value=${{ steps.set-version.outputs.VERSION_RESTIC }},enable=${{ github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
+
+      - name: Set up Docker Buildx
+        id: docker_buildx
+        uses: docker/setup-buildx-action@v2
+        with:
+          platforms: linux/amd64,linux/arm64/v8
+
+      - name: Login to Github Container Registry
+        if: github.event_name != 'pull_request'
+        uses: docker/login-action@v2
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push
+        id: docker_build
+        uses: docker/build-push-action@v4
+        with:
+          context: .
+          push: ${{ github.event_name != 'pull_request' }}
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          platforms: ${{ steps.docker_buildx.outputs.platforms }}
+          build-args: |
+            VERSION_RESTIC=${{ steps.set-version.outputs.VERSION_RESTIC }}
+
+      - name: Image digest
+        run: echo ${{ steps.docker_build.outputs.digest }}

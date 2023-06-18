@@ -1,95 +1,68 @@
 #!/bin/bash
 set -uo pipefail
 
-log_tmp_file=$(mktemp)
-echo "Will write logs to $log_tmp_file"
-
-logLast() {
-    echo "$1" | tee -a "$log_tmp_file"
-}
-
-healthcheck() {
-    local suffix=${1:-}
-    if [ -n "$HEALTHCHECK_URL" ]; then
-        echo -n "Reporting healthcheck $suffix ... "
-        curl -fSsL --retry 3 -X POST \
-            --user-agent "docker-restic/0.1.0" \
-            --data-binary "@${log_tmp_file}" "${HEALTHCHECK_URL}${suffix}"
-        echo
-    else
-        echo "No HEALTHCHECK_URL provided. Skipping healthcheck."
-    fi
-}
-
-healthcheck /start
-
 restic snapshots &>/dev/null
 status=$?
-logLast "Check Repo status $status"
+echo "Check repo status $status"
 
 if [ $status != 0 ]; then
-    logLast "Repository '${RESTIC_REPOSITORY}' does not exist. Initialize repo with 'restic init'."
-    healthcheck /fail
+    echo "Repository '${RESTIC_REPOSITORY}' does not exist. Initialize repo with 'restic init'."
     exit 1
 fi
 
 if [ -f "/hooks/pre-backup.sh" ]; then
-    logLast "Running pre-backup script."
-    /hooks/pre-backup.sh 2>&1 | tee -a "$log_tmp_file"
+    echo "Running pre-backup script."
+    /hooks/pre-backup.sh
 else
-    logLast "No /hooks/pre-backup.sh script found. Skipping."
+    echo "No /hooks/pre-backup.sh script found. Skipping."
 fi
 
 start=$(date +'%s')
-logLast "Starting Backup at $(date +"%Y-%m-%d %H:%M:%S")"
-logLast "RESTIC_REPOSITORY: ${RESTIC_REPOSITORY:-}"
-logLast "RESTIC_JOB_ARGS: ${RESTIC_JOB_ARGS:-}"
-logLast "RESTIC_FORGET_ARGS: ${RESTIC_FORGET_ARGS:-}"
-logLast ""
-logLast "Directory tree:"
+echo "Starting Backup at $(date +"%Y-%m-%d %H:%M:%S")"
+echo "RESTIC_REPOSITORY: ${RESTIC_REPOSITORY:-}"
+echo "RESTIC_JOB_ARGS: ${RESTIC_JOB_ARGS:-}"
+echo "RESTIC_FORGET_ARGS: ${RESTIC_FORGET_ARGS:-}"
+echo ""
+echo "Directory tree:"
 
-tree -xdp /data | tee -a "$log_tmp_file"
+tree -xdp /data
 
 # shellcheck disable=SC2086
-restic backup /data ${RESTIC_JOB_ARGS} "$@" 2>&1 | tee -a "$log_tmp_file"
+restic backup /data ${RESTIC_JOB_ARGS}
 rc_backup=$?
-logLast "Finished backup at $(date +"%Y-%m-%d %H:%M:%S")"
+echo "Finished backup at $(date +"%Y-%m-%d %H:%M:%S")"
 if [[ $rc_backup == 0 ]]; then
-    logLast "Backup Successful"
+    echo "Backup Successful"
 else
-    logLast "Backup Failed with Status ${rc_backup}"
+    echo "Backup Failed with Status ${rc_backup}"
     restic unlock
 fi
 
 if [ -n "${RESTIC_FORGET_ARGS:-}" ]; then
-    logLast "Forgetting old snapshots based on RESTIC_FORGET_ARGS = ${RESTIC_FORGET_ARGS}"
+    echo "Forgetting old snapshots based on RESTIC_FORGET_ARGS = ${RESTIC_FORGET_ARGS}"
     # shellcheck disable=SC2086
-    restic forget ${RESTIC_FORGET_ARGS} 2>&1 | tee -a "$log_tmp_file"
+    restic forget ${RESTIC_FORGET_ARGS}
     rc_forget=$?
-    logLast "Finished forget at $(date)"
+    echo "Finished forget at $(date +"%Y-%m-%d %H:%M:%S")"
     if [[ $rc_forget == 0 ]]; then
-        logLast "Forget Successful"
+        echo "Forget Successful"
     else
-        logLast "Forget Failed with Status ${rc_forget}"
+        echo "Forget Failed with Status ${rc_forget}"
         restic unlock
     fi
 else
-    logLast "No RESTIC_FORGET_ARGS provided. Skipping forget."
+    echo "No RESTIC_FORGET_ARGS provided. Skipping forget."
+    rc_forget=0
 fi
 
 end=$(date +'%s')
-logLast "Finished Backup at $(date +"%Y-%m-%d %H:%M:%S") after $((end - start)) seconds"
+echo "Finished Backup at $(date +"%Y-%m-%d %H:%M:%S") after $((end - start)) seconds"
 
 if [ -f "/hooks/post-backup.sh" ]; then
-    logLast "Running post-backup script."
-    RC_BACKUP=$rc_backup RC_FORGET=$rc_forget \
-        /hooks/post-backup.sh 2>&1 | tee -a "$log_tmp_file"
+    echo "Running post-backup script."
+    RC_BACKUP=$rc_backup RC_FORGET=$rc_forget /hooks/post-backup.sh
 else
-    logLast "No /hooks/post-backup.sh script found. Skipping."
+    echo "No /hooks/post-backup.sh script found. Skipping."
 fi
 
-if [ $rc_backup = 0 ]; then
-    healthcheck
-else
-    healthcheck /fail
-fi
+exit $((rc_backup + rc_forget))
