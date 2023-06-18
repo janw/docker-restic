@@ -3,6 +3,7 @@ ARG VERSION_RESTIC=
 
 WORKDIR /src
 
+# hadolint ignore=DL3018
 RUN \
     set -e; \
     apk add --no-cache git; \
