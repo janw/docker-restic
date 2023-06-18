@@ -28,6 +28,7 @@ jobs:
     with:
       image-name: janw/restic
       tag-latest: true
+      version-tag: v${{ needs.populate-version.outputs.VERSION_RESTIC }}
       build-args: |
         VERSION_RESTIC=${{ needs.populate-version.outputs.VERSION_RESTIC }}
       build-platforms: linux/amd64,linux/arm64/v8
