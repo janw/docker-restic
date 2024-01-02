@@ -1,7 +1,7 @@
 #!/bin/bash
 set -uo pipefail
 
-restic snapshots &>/dev/null
+restic cat config
 status=$?
 echo "Check repo status $status"
 
