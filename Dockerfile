@@ -3,12 +3,6 @@ FROM ghcr.io/bdd/runitor:v1.3.0-alpine AS runitor
 
 FROM docker.io/library/alpine:3
 
-ENV RESTIC_REPOSITORY=/target
-ENV RESTIC_PASSWORD=
-ENV RESTIC_JOB_ARGS=
-ENV RESTIC_FORGET_ARGS=
-ENV HEALTHCHECK_URL=
-
 # hadolint ignore=DL3018
 RUN set -e; \
     apk add --update --no-cache \

@@ -20,6 +20,7 @@ fi
 start=$(date +'%s')
 echo "Starting Backup at $(date +"%Y-%m-%d %H:%M:%S")"
 echo "RESTIC_REPOSITORY: ${RESTIC_REPOSITORY:-}"
+echo "RESTIC_PASSWORD: $(test -n "${RESTIC_PASSWORD}" && echo "<set>" || echo "<not set>")"
 echo "RESTIC_JOB_ARGS: ${RESTIC_JOB_ARGS:-}"
 echo "RESTIC_FORGET_ARGS: ${RESTIC_FORGET_ARGS:-}"
 echo ""
