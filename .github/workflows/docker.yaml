@@ -17,7 +17,7 @@ jobs:
       - name: Set version
         id: set-version
         run: |
-          VERSION_RESTIC=$(cat VERSION)
+          VERSION_RESTIC=$(sed -n 's/FROM.*restic:\(.*\) AS.*/\1/p' Dockerfile)
           echo "VERSION_RESTIC=$VERSION_RESTIC" >> $GITHUB_OUTPUT
 
       - name: Docker meta
@@ -39,7 +39,7 @@ jobs:
         id: docker_buildx
         uses: docker/setup-buildx-action@v2
         with:
-          platforms: linux/amd64,linux/arm64/v8
+          platforms: linux/amd64,linux/arm64
 
       - name: Login to Github Container Registry
         if: github.event_name != 'pull_request'
@@ -58,8 +58,6 @@ jobs:
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           platforms: ${{ steps.docker_buildx.outputs.platforms }}
-          build-args: |
-            VERSION_RESTIC=${{ steps.set-version.outputs.VERSION_RESTIC }}
 
       - name: Image digest
         run: echo ${{ steps.docker_build.outputs.digest }}
